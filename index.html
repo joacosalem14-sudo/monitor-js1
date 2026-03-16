@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor Binance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #080b10;
+    --surface:   #0d1117;
+    --surface2:  #111820;
+    --border:    #1c2333;
+    --green:     #00e676;
+    --green-dim: #00e67618;
+    --amber:     #ffab00;
+    --red:       #ff5252;
+    --red-dim:   #ff525218;
+    --blue:      #40c4ff;
+    --purple:    #ce93d8;
+    --muted:     #4a5568;
+    --text:      #c9d1d9;
+    --text-dim:  #6e7f94;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,230,118,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,230,118,.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+  #app { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+
+  /* HEADER */
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .logo { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo span { color: var(--green); }
+  .badge { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; padding: 3px 8px; border-radius: 3px; text-transform: uppercase; }
+  .badge-green  { background: var(--green-dim); color: var(--green); border: 1px solid #00e67640; }
+  .badge-amber  { background: #ffab0015; color: var(--amber); border: 1px solid #ffab0040; }
+  .badge-red    { background: var(--red-dim); color: var(--red); border: 1px solid #ff525240; }
+  .badge-muted  { background: #ffffff08; color: var(--muted); border: 1px solid var(--border); }
+  .badge-blue   { background: #40c4ff15; color: var(--blue); border: 1px solid #40c4ff40; }
+
+  /* CONFIG NOTE */
+  .config-note {
+    background: #ffab0012; border: 1px solid #ffab0030; border-radius: 6px;
+    padding: 10px 14px; font-size: 11px; color: var(--amber); margin-bottom: 16px; display: none;
+  }
+
+  /* STATUS BAR */
+  .statusbar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 18px; display: flex; align-items: center; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-label { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+  .stat-value { font-size: 18px; font-weight: 700; color: var(--green); }
+  .stat-value.amber { color: var(--amber); }
+  .stat-value.blue  { color: var(--blue); }
+  .divider-v { width: 1px; height: 36px; background: var(--border); flex-shrink: 0; }
+  .progress-wrap { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 5px; }
+  .progress-track { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.2s; width: 0%; }
+  .progress-label { font-size: 10px; color: var(--text-dim); }
+  .countdown-wrap { display: flex; align-items: center; gap: 10px; }
+  .countdown-ring { position: relative; width: 42px; height: 42px; }
+  .countdown-ring svg { transform: rotate(-90deg); }
+  .countdown-ring circle { fill: none; stroke-width: 3; }
+  .ring-bg   { stroke: var(--border); }
+  .ring-fill { stroke: var(--green); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+  .countdown-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--green); }
+
+  /* CONTROLS */
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn { background: transparent; border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 11px; padding: 6px 14px; border-radius: 5px; cursor: pointer; transition: all .15s; letter-spacing: .5px; }
+  .btn:hover { border-color: var(--green); color: var(--green); }
+  .btn.primary { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .btn.primary:hover { background: #00e67628; }
+  label { font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+  input[type=number] { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 5px 8px; border-radius: 4px; width: 56px; text-align: center; }
+  input[type=number]:focus { outline: none; border-color: var(--green); }
+
+  /* SECTION TITLE */
+  .section-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ALERTS GRID */
+  #alerts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-bottom: 28px; min-height: 60px; }
+  .empty-state { grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--muted); font-size: 12px; border: 1px dashed var(--border); border-radius: 8px; }
+  .empty-state .icon { font-size: 28px; margin-bottom: 8px; display: block; opacity: .4; }
+
+  /* ALERT CARD */
+  .alert-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    animation: cardIn .3s ease;
+    transition: box-shadow .2s;
+  }
+  .alert-card:hover { box-shadow: 0 0 24px #00e67610; }
+
+  /* Signal stripe on top */
+  .alert-card.sig-short { border-color: #ff525260; }
+  .alert-card.sig-short::before { content:''; display:block; height:3px; background: linear-gradient(90deg, var(--red), transparent); }
+  .alert-card.sig-neutral { border-color: #ffab0060; }
+  .alert-card.sig-neutral::before { content:''; display:block; height:3px; background: linear-gradient(90deg, var(--amber), transparent); }
+  .alert-card.sig-long { border-color: #00e67660; }
+  .alert-card.sig-long::before { content:''; display:block; height:3px; background: linear-gradient(90deg, var(--green), transparent); }
+
+  .card-inner { padding: 14px 16px; }
+
+  /* Card header */
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .card-symbol { font-size: 15px; font-weight: 700; color: #fff; }
+  .card-change { font-size: 20px; font-weight: 700; color: var(--green); }
+  .card-speed { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+  /* Signal box */
+  .signal-box {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-radius: 6px; margin-bottom: 12px;
+  }
+  .signal-box.short { background: var(--red-dim); border: 1px solid #ff525230; }
+  .signal-box.neutral { background: #ffab0010; border: 1px solid #ffab0030; }
+  .signal-box.long { background: var(--green-dim); border: 1px solid #00e67630; }
+  .signal-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+  .signal-label.short { color: var(--red); }
+  .signal-label.neutral { color: var(--amber); }
+  .signal-label.long { color: var(--green); }
+  .signal-score { font-size: 10px; color: var(--text-dim); }
+  .signal-dots { display: flex; gap: 3px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+  .dot.red    { background: var(--red); }
+  .dot.amber  { background: var(--amber); }
+  .dot.green  { background: var(--green); }
+
+  /* Data rows */
+  .card-section-label { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin: 10px 0 5px; }
+  .card-rows { display: flex; flex-direction: column; gap: 5px; }
+  .card-row { display: flex; justify-content: space-between; align-items: center; }
+  .card-key { color: var(--text-dim); font-size: 11px; }
+  .card-val { font-size: 11px; font-weight: 700; }
+  .v-green  { color: var(--green); }
+  .v-amber  { color: var(--amber); }
+  .v-red    { color: var(--red); }
+  .v-blue   { color: var(--blue); }
+  .v-purple { color: var(--purple); }
+  .v-muted  { color: var(--muted); }
+
+  /* Mini indicator pill */
+  .pill { font-size: 9px; padding: 1px 6px; border-radius: 10px; font-weight: 700; letter-spacing: .5px; }
+  .pill-red   { background: var(--red-dim); color: var(--red); }
+  .pill-green { background: var(--green-dim); color: var(--green); }
+  .pill-amber { background: #ffab0015; color: var(--amber); }
+
+  .card-divider { height: 1px; background: var(--border); margin: 10px 0; }
+
+  .card-footer { padding: 10px 16px; background: var(--surface2); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .card-time { font-size: 10px; color: var(--muted); }
+  .card-link { font-size: 10px; color: var(--blue); text-decoration: none; letter-spacing: .5px; }
+  .card-link:hover { text-decoration: underline; }
+
+  @keyframes cardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* LOG */
+  #log-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .log-header { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center; }
+  #log-body { max-height: 180px; overflow-y: auto; padding: 10px 16px; }
+  #log-body::-webkit-scrollbar { width: 4px; }
+  #log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-line { font-size: 11px; line-height: 1.8; display: flex; gap: 10px; }
+  .log-line .ts  { color: var(--muted); min-width: 60px; }
+  .log-line .msg { color: var(--text-dim); }
+  .log-line.ok   .msg { color: var(--green); }
+  .log-line.warn .msg { color: var(--amber); }
+  .log-line.err  .msg { color: var(--red); }
+
+  .pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; box-shadow: 0 0 0 0 #00e67660; } 50% { opacity:.6; box-shadow: 0 0 0 5px transparent; } }
+  .scanning .progress-fill { background: linear-gradient(90deg, var(--green), var(--blue), var(--green)); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+  /* LOOKUP PANEL */
+  #lookup-panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: 20px; overflow: hidden;
+  }
+  .lookup-header {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .lookup-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  .lookup-input-wrap { display: flex; gap: 8px; flex: 1; min-width: 200px; }
+  #lookup-input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text); font-family: inherit; font-size: 13px; font-weight: 700;
+    padding: 7px 12px; text-transform: uppercase; letter-spacing: 1px;
+  }
+  #lookup-input:focus { outline: none; border-color: var(--blue); }
+  #lookup-input::placeholder { color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .btn-blue { border-color: var(--blue); color: var(--blue); background: #40c4ff12; }
+  .btn-blue:hover { background: #40c4ff22; }
+  #lookup-result { padding: 16px; display: none; }
+  #lookup-result.visible { display: block; }
+  .lookup-loading { color: var(--text-dim); font-size: 12px; padding: 10px 0; }
+  .lookup-error { color: var(--red); font-size: 12px; padding: 10px 0; }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <div class="logo">BINANCE <span>SCAN</span></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:.5px;">FUTUROS PERPETUOS USDT — DETECTOR DE FANOUTS</div>
+    </div>
+    <div class="controls">
+      <label>Umbral <input type="number" id="threshold" value="20" min="1" max="100"> %</label>
+      <button class="btn primary" onclick="scanNow()">▶ Escanear ahora</button>
+      <button class="btn" id="btn-pause" onclick="togglePause()">⏸ Pausar</button>
+    </div>
+  </header>
+
+
+  <!-- LOOKUP PANEL -->
+  <div id="lookup-panel">
+    <div class="lookup-header">
+      <span class="lookup-title">🔍 Analizar ticker</span>
+      <div class="lookup-input-wrap">
+        <input id="lookup-input" type="text" placeholder="Ej: BTCUSDT, ETH, SOL..." 
+               onkeydown="if(event.key==='Enter') lookupTicker()" autocomplete="off" autocorrect="off" spellcheck="false"/>
+        <button class="btn btn-blue" onclick="lookupTicker()">Analizar</button>
+      </div>
+    </div>
+    <div id="lookup-result"></div>
+  </div>
+
+  <div id="config-note" class="config-note">
+    ⚠️ CORS bloqueado al abrir como archivo local. El monitor intentará múltiples proxies automáticamente.
+  </div>
+
+  <div class="statusbar" id="statusbar">
+    <div class="stat"><span class="stat-label">Alertas</span><span class="stat-value" id="stat-alerts">—</span></div>
+    <div class="divider-v"></div>
+    <div class="stat"><span class="stat-label">Mercados</span><span class="stat-value blue" id="stat-total">—</span></div>
+    <div class="divider-v"></div>
+    <div class="stat"><span class="stat-label">Escaneo</span><span class="stat-value amber" id="stat-scan">#0</span></div>
+    <div class="divider-v"></div>
+    <div class="progress-wrap">
+      <div class="progress-label" id="progress-label">En espera...</div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+    <div class="countdown-wrap">
+      <div class="countdown-ring">
+        <svg width="42" height="42" viewBox="0 0 42 42">
+          <circle class="ring-bg" cx="21" cy="21" r="18"/>
+          <circle class="ring-fill" id="ring" cx="21" cy="21" r="18" stroke-dasharray="113" stroke-dashoffset="0"/>
+        </svg>
+        <div class="countdown-num" id="countdown-num">—</div>
+      </div>
+      <span id="status-badge" class="badge badge-muted">IDLE</span>
+    </div>
+  </div>
+
+  <div class="section-title"><span class="pulse-dot"></span>Alertas activas</div>
+  <div id="alerts-grid">
+    <div class="empty-state"><span class="icon">📡</span>Iniciando escaneo...</div>
+  </div>
+
+  <div class="section-title">Log</div>
+  <div id="log-wrap">
+    <div class="log-header"><span>Actividad reciente</span><button class="btn" style="padding:2px 8px;font-size:10px" onclick="clearLog()">Limpiar</button></div>
+    <div id="log-body"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════
+const BINANCE_BASE = 'https://fapi.binance.com';
+const PROXY_LIST = [
+  url => url,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://proxy.cors.sh/${url}`,
+];
+const PROXY_NAMES = ['directo','corsproxy.io','allorigins.win','cors.sh'];
+let activeProxy = 0;
+
+const INTERVAL_SEC = 200;
+const BATCH = 30;
+
+let scanCount = 0, paused = false, countdown = 0;
+let countdownRef = null, allSymbols = [];
+
+// ══════════════════════════════════════════════════════
+//  LOG
+// ══════════════════════════════════════════════════════
+function log(msg, type='') {
+  const body = document.getElementById('log-body');
+  const ts = new Date().toLocaleTimeString('es-AR',{hour12:false});
+  const el = document.createElement('div');
+  el.className = `log-line ${type}`;
+  el.innerHTML = `<span class="ts">${ts}</span><span class="msg">${msg}</span>`;
+  body.prepend(el);
+  while (body.children.length > 80) body.removeChild(body.lastChild);
+}
+function clearLog() { document.getElementById('log-body').innerHTML = ''; }
+
+// ══════════════════════════════════════════════════════
+//  FETCH CON FALLBACK DE PROXIES
+// ══════════════════════════════════════════════════════
+async function binanceFetch(path) {
+  const targetUrl = `${BINANCE_BASE}${path}`;
+  for (let i = activeProxy; i < PROXY_LIST.length; i++) {
+    try {
+      const r = await fetch(PROXY_LIST[i](targetUrl), { signal: AbortSignal.timeout(9000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      if (i !== activeProxy) {
+        activeProxy = i;
+        log(`Proxy activo: ${PROXY_NAMES[i]}`, 'ok');
+        document.getElementById('config-note').style.display = 'none';
+      }
+      return data;
+    } catch(e) { /* probar siguiente */ }
+  }
+  activeProxy = 0;
+  throw new Error('Todos los proxies fallaron');
+}
+
+// ══════════════════════════════════════════════════════
+//  BINANCE API CALLS
+// ══════════════════════════════════════════════════════
+async function getSymbols() {
+  const d = await binanceFetch('/fapi/v1/exchangeInfo');
+  return d.symbols
+    .filter(s => s.pair.endsWith('USDT') && s.contractType === 'PERPETUAL')
+    .map(s => s.symbol);
+}
+
+async function safeGet(path) {
+  try { return await binanceFetch(path); } catch(_) { return null; }
+}
+
+// ══════════════════════════════════════════════════════
+//  INDICADORES
+// ══════════════════════════════════════════════════════
+function calcRSI(closes, period=14) {
+  if (closes.length < period+1) return null;
+  let gains=0, losses=0;
+  for (let i=1; i<=period; i++) {
+    const d = closes[i]-closes[i-1];
+    if (d>0) gains+=d; else losses-=d;
+  }
+  let ag=gains/period, al=losses/period;
+  for (let i=period+1; i<closes.length; i++) {
+    const d = closes[i]-closes[i-1];
+    ag = (ag*(period-1)+Math.max(d,0))/period;
+    al = (al*(period-1)+Math.max(-d,0))/period;
+  }
+  return al===0 ? 100 : 100-100/(1+ag/al);
+}
+
+// Detecta en qué vela del 1m se dio el mayor salto → velocidad del pump
+function detectSpeed(klines1m) {
+  let maxJump = 0, jumpCandle = 0;
+  for (let i=1; i<klines1m.length; i++) {
+    const prev = parseFloat(klines1m[i-1][4]);
+    const curr = parseFloat(klines1m[i][2]);
+    const jump = (curr-prev)/prev*100;
+    if (jump > maxJump) { maxJump=jump; jumpCandle=i; }
+  }
+  // ¿cuántas velas tuvo el movimiento principal?
+  const bigCandles = klines1m.filter(k => {
+    const body = Math.abs(parseFloat(k[4])-parseFloat(k[1]));
+    const range = parseFloat(k[2])-parseFloat(k[3]);
+    return range > 0 && body/range > 0.5; // vela de cuerpo sólido
+  }).length;
+  return { bigCandles, spikeCandle: jumpCandle === 1 || jumpCandle === 14 };
+}
+
+// Mecha superior de las últimas 3 velas (% del rango total)
+function calcUpperWick(klines) {
+  const last3 = klines.slice(-3);
+  const wicks = last3.map(k => {
+    const high  = parseFloat(k[2]);
+    const close = parseFloat(k[4]);
+    const open  = parseFloat(k[1]);
+    const low   = parseFloat(k[3]);
+    const range = high-low;
+    if (range===0) return 0;
+    const wick  = high - Math.max(close, open);
+    return (wick/range)*100;
+  });
+  return wicks.reduce((a,b)=>a+b,0)/wicks.length;
+}
+
+// Taker buy ratio de las últimas 5 velas 1m
+function calcBuyRatio(klines) {
+  const last5 = klines.slice(-5);
+  const buyVol  = last5.reduce((s,k)=>s+parseFloat(k[9]),0);
+  const totalVol= last5.reduce((s,k)=>s+parseFloat(k[5]),0);
+  return totalVol>0 ? (buyVol/totalVol)*100 : null;
+}
+
+// ══════════════════════════════════════════════════════
+//  SEÑAL: puntaje de SHORT (más alto = más prob de dump)
+// ══════════════════════════════════════════════════════
+function calcSignal({ rsi, funding, oiChange, lsRatio, buyRatio, upperWick, bigCandles, spikeCandle }) {
+  let score = 0;
+  const reasons = [];
+
+  if (rsi != null) {
+    if (rsi > 90) { score+=2; reasons.push('RSI >90'); }
+    else if (rsi > 80) { score+=1; reasons.push('RSI >80'); }
+  }
+  if (funding != null) {
+    if (funding > 0.5)      { score+=3; reasons.push(`Funding +${funding.toFixed(2)}% 🔴`); }
+    else if (funding > 0.15){ score+=1; reasons.push(`Funding +${funding.toFixed(2)}%`); }
+    else if (funding < 0)   { score-=1; reasons.push('Funding negativo'); }
+  }
+  if (oiChange != null) {
+    if (oiChange < -5)      { score+=2; reasons.push(`OI -${Math.abs(oiChange).toFixed(1)}% (dist.)`); }
+    else if (oiChange > 10) { score+=1; reasons.push(`OI +${oiChange.toFixed(1)}% (squeeze)`); }
+  }
+  if (lsRatio != null) {
+    if (lsRatio > 75)       { score+=2; reasons.push(`${lsRatio.toFixed(0)}% longs`); }
+    else if (lsRatio < 40)  { score-=1; }
+  }
+  if (buyRatio != null) {
+    if (buyRatio < 40)      { score+=2; reasons.push(`Buy ratio ${buyRatio.toFixed(0)}% 🔴`); }
+    else if (buyRatio > 65) { score-=1; }
+  }
+  if (upperWick != null) {
+    if (upperWick > 40)     { score+=2; reasons.push(`Mecha sup ${upperWick.toFixed(0)}%`); }
+    else if (upperWick > 25){ score+=1; }
+  }
+  if (spikeCandle)          { score+=2; reasons.push('Spike de 1 vela (liquidación)'); }
+  else if (bigCandles >= 4) { score-=1; }
+
+  // Clasificar
+  let signal;
+  if      (score >= 6) signal = 'short';
+  else if (score >= 3) signal = 'neutral';
+  else                 signal = 'long';
+
+  return { score, signal, reasons };
+}
+
+// ══════════════════════════════════════════════════════
+//  PROCESAR SÍMBOLO
+// ══════════════════════════════════════════════════════
+async function processSymbol(symbol, skipThreshold=false) {
+  try {
+    // Klines 1m (15 velas) — ya los teníamos
+    const k1m = await safeGet(`/fapi/v1/klines?symbol=${symbol}&interval=1m&limit=15`);
+    if (!k1m || k1m.length < 15) return null;
+
+    const low5  = Math.min(...k1m.slice(0,5).map(k=>parseFloat(k[3])));
+    const high5 = Math.max(...k1m.slice(-5).map(k=>parseFloat(k[2])));
+    if (low5 <= 0) return null;
+
+    const change = (high5-low5)/low5*100;
+    const threshold = parseFloat(document.getElementById('threshold').value)||20;
+    if (!skipThreshold && change <= threshold) return null;
+
+    // ── A partir de aquí, símbolo calificó → buscar todos los extras en paralelo ──
+    const [k15m, fundingData, oiNow, oiPrev, lsData] = await Promise.all([
+      safeGet(`/fapi/v1/klines?symbol=${symbol}&interval=15m&limit=20`),
+      safeGet(`/fapi/v1/premiumIndex?symbol=${symbol}`),
+      safeGet(`/fapi/v1/openInterest?symbol=${symbol}`),
+      safeGet(`/fapi/v1/klines?symbol=${symbol}&interval=15m&limit=3`), // OI histórico aproximado via precio*vol
+      safeGet(`/futures/data/globalLongShortAccountRatio?symbol=${symbol}&period=5m&limit=2`),
+    ]);
+
+    // RSI 15m
+    let rsi = null;
+    if (k15m && k15m.length >= 15) {
+      rsi = calcRSI(k15m.map(k=>parseFloat(k[4])), 14);
+    }
+
+    // Funding rate (en %)
+    let funding = null;
+    if (fundingData && fundingData.lastFundingRate != null) {
+      funding = parseFloat(fundingData.lastFundingRate) * 100;
+    }
+
+    // OI change: comparamos el OI actual vs el de hace 30 min (approx usando vela anterior)
+    let oiChange = null;
+    if (oiNow && oiPrev && oiPrev.length >= 2) {
+      const oiCurr = parseFloat(oiNow.openInterest);
+      // Estimamos OI pasado con volumen de vela 15m anterior (aproximación)
+      // Si tenemos dos puntos de OI vía klines de futuros
+      const vol1 = parseFloat(oiPrev[oiPrev.length-1][7]); // quote vol vela actual
+      const vol0 = parseFloat(oiPrev[0][7]);                // quote vol vela anterior
+      if (vol0 > 0) oiChange = ((vol1-vol0)/vol0)*100;
+    }
+
+    // Long/Short ratio
+    let lsRatio = null; // % de longs
+    if (lsData && lsData.length > 0) {
+      const ls = lsData[lsData.length-1];
+      if (ls && ls.longAccount) {
+        lsRatio = parseFloat(ls.longAccount)*100;
+      }
+    }
+
+    // Taker buy ratio (de klines 1m)
+    const buyRatio  = calcBuyRatio(k1m);
+    const upperWick = calcUpperWick(k1m);
+    const { bigCandles, spikeCandle } = detectSpeed(k1m);
+
+    const { score, signal, reasons } = calcSignal({ rsi, funding, oiChange, lsRatio, buyRatio, upperWick, bigCandles, spikeCandle });
+
+    return {
+      symbol, change, low: low5, high: high5, time: new Date(),
+      rsi, funding, oiChange, lsRatio, buyRatio, upperWick, bigCandles, spikeCandle,
+      score, signal, reasons
+    };
+  } catch(_) { return null; }
+}
+
+// ══════════════════════════════════════════════════════
+//  SCAN LOOP
+// ══════════════════════════════════════════════════════
+async function scan() {
+  if (paused) return;
+  scanCount++;
+  document.getElementById('stat-scan').textContent = `#${scanCount}`;
+  setBadge('SCAN', 'green');
+  document.getElementById('statusbar').classList.add('scanning');
+  log(`Escaneo #${scanCount} — ${allSymbols.length} mercados`);
+
+  const t0 = Date.now();
+  const alerts = [];
+  let done = 0;
+
+  for (let i=0; i<allSymbols.length; i+=BATCH) {
+    if (paused) break;
+    const batch = allSymbols.slice(i, i+BATCH);
+    const results = await Promise.all(batch.map(processSymbol));
+    results.forEach(r => { if (r) alerts.push(r); });
+    done += batch.length;
+    setProgress(done, allSymbols.length);
+  }
+
+  const elapsed = ((Date.now()-t0)/1000).toFixed(1);
+  document.getElementById('statusbar').classList.remove('scanning');
+  document.getElementById('stat-alerts').textContent = alerts.length;
+  setProgress(allSymbols.length, allSymbols.length);
+
+  if (!alerts.length) {
+    log(`Sin alertas. ${elapsed}s`);
+    renderEmpty();
+  } else {
+    const shorts = alerts.filter(a=>a.signal==='short').length;
+    log(`¡${alerts.length} alerta(s)! ${shorts} SHORT. ${elapsed}s`, 'ok');
+    flashTitle(alerts.sort((a,b)=>b.score-a.score)[0].symbol);
+    renderAlerts(alerts);
+  }
+
+  startCountdown(INTERVAL_SEC);
+  setBadge('ESPERA', 'muted');
+}
+
+async function scanNow() {
+  clearCountdown();
+  if (!allSymbols.length) await loadSymbols();
+  scan();
+}
+
+async function loadSymbols() {
+  try {
+    log('Cargando símbolos...');
+    allSymbols = await getSymbols();
+    document.getElementById('stat-total').textContent = allSymbols.length;
+    log(`${allSymbols.length} pares cargados`, 'ok');
+  } catch(e) {
+    log(`Error: ${e.message}`, 'err');
+    document.getElementById('config-note').style.display = 'block';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════════
+function fmt(n, decimals=2) {
+  if (n==null) return '<span class="v-muted">N/A</span>';
+  return n.toFixed(decimals);
+}
+function fmtPrice(n) {
+  if (n>=1000) return n.toFixed(2);
+  if (n>=1)    return n.toFixed(4);
+  return n.toPrecision(4);
+}
+function colorVal(val, thresholds, colors, decimals=2, suffix='') {
+  if (val==null) return `<span class="v-muted">N/A</span>`;
+  const str = val.toFixed(decimals)+suffix;
+  for (let i=0; i<thresholds.length; i++) {
+    if (val >= thresholds[i]) return `<span class="${colors[i]}">${str}</span>`;
+  }
+  return `<span class="${colors[colors.length-1]}">${str}</span>`;
+}
+
+function renderEmpty() {
+  document.getElementById('alerts-grid').innerHTML =
+    `<div class="empty-state"><span class="icon">🔍</span>Sin alertas — umbral +${document.getElementById('threshold').value}%</div>`;
+}
+
+function renderAlerts(alerts) {
+  const sorted = [...alerts].sort((a,b) => b.score - a.score);
+  document.getElementById('alerts-grid').innerHTML = sorted.map(a => {
+    const pairLink = a.symbol.replace('USDT','_USDT');
+    const link = `https://www.binance.com/es-AR/futures/${pairLink}`;
+    const ts = a.time.toLocaleTimeString('es-AR',{hour12:false});
+
+    // Signal box
+    const sigLabels = { short:'🔴 PROBABLE TECHO — SHORT', neutral:'🟡 SEÑAL MIXTA', long:'🟢 MOMENTUM — POSIBLE CONTINÚA' };
+    const sigLabel = sigLabels[a.signal];
+
+    // Score dots (max 10)
+    const dots = Array.from({length:8}, (_,i) => {
+      if (i < a.score) {
+        const cl = a.score>=6?'red': a.score>=3?'amber':'green';
+        return `<div class="dot ${cl}"></div>`;
+      }
+      return `<div class="dot"></div>`;
+    }).join('');
+
+    // RSI color
+    const rsiColor = a.rsi==null?'v-muted': a.rsi>90?'v-red': a.rsi>80?'v-amber': a.rsi>60?'v-purple':'v-green';
+    const rsiStr   = a.rsi!=null ? a.rsi.toFixed(1) : 'N/A';
+
+    // Funding color
+    const fundColor = a.funding==null?'v-muted': a.funding>0.5?'v-red': a.funding>0.15?'v-amber': a.funding<0?'v-green':'v-blue';
+    const fundStr   = a.funding!=null ? (a.funding>=0?'+':'')+a.funding.toFixed(3)+'%' : 'N/A';
+
+    // OI change
+    const oiColor = a.oiChange==null?'v-muted': a.oiChange<-5?'v-red': a.oiChange<0?'v-amber': a.oiChange>10?'v-amber':'v-green';
+    const oiStr   = a.oiChange!=null ? (a.oiChange>=0?'+':'')+a.oiChange.toFixed(1)+'%' : 'N/A';
+
+    // L/S
+    const lsColor = a.lsRatio==null?'v-muted': a.lsRatio>75?'v-red': a.lsRatio>60?'v-amber':'v-green';
+    const lsStr   = a.lsRatio!=null ? a.lsRatio.toFixed(0)+'% L' : 'N/A';
+
+    // Buy ratio
+    const brColor = a.buyRatio==null?'v-muted': a.buyRatio<40?'v-red': a.buyRatio<50?'v-amber': a.buyRatio>65?'v-green':'v-blue';
+    const brStr   = a.buyRatio!=null ? a.buyRatio.toFixed(0)+'%' : 'N/A';
+
+    // Wick
+    const wickColor = a.upperWick>40?'v-red': a.upperWick>25?'v-amber':'v-green';
+    const wickStr   = a.upperWick!=null ? a.upperWick.toFixed(0)+'%' : 'N/A';
+
+    // Speed
+    const speedStr  = a.spikeCandle ? '<span class="v-red">Spike 1 vela</span>' : `<span class="v-green">${a.bigCandles} velas sólidas</span>`;
+
+    const reasonsHtml = a.reasons.length
+      ? a.reasons.slice(0,3).map(r=>`<span class="pill pill-red">${r}</span>`).join(' ')
+      : `<span class="v-muted" style="font-size:10px">Sin señales de techo</span>`;
+
+    return `
+<div class="alert-card sig-${a.signal}">
+  <div class="card-inner">
+    <div class="card-header">
+      <div>
+        <div class="card-symbol">${a.symbol}</div>
+        <div class="card-speed">${speedStr}</div>
+      </div>
+      <span class="card-change">+${a.change.toFixed(2)}%</span>
+    </div>
+
+    <div class="signal-box ${a.signal}">
+      <div>
+        <div class="signal-label ${a.signal}">${sigLabel}</div>
+        <div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap">${reasonsHtml}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="signal-dots">${dots}</div>
+        <div class="signal-score" style="margin-top:4px">score ${a.score}/8</div>
+      </div>
+    </div>
+
+    <div class="card-section-label">Momentum</div>
+    <div class="card-rows">
+      <div class="card-row">
+        <span class="card-key">RSI 15m</span>
+        <span class="card-val ${rsiColor}">${rsiStr}</span>
+      </div>
+      <div class="card-row">
+        <span class="card-key">Taker buy ratio</span>
+        <span class="card-val ${brColor}">${brStr}</span>
+      </div>
+      <div class="card-row">
+        <span class="card-key">Mecha superior</span>
+        <span class="card-val ${wickColor}">${wickStr}</span>
+      </div>
+    </div>
+
+    <div class="card-divider"></div>
+    <div class="card-section-label">Posicionamiento</div>
+    <div class="card-rows">
+      <div class="card-row">
+        <span class="card-key">Funding rate</span>
+        <span class="card-val ${fundColor}">${fundStr}</span>
+      </div>
+      <div class="card-row">
+        <span class="card-key">OI cambio</span>
+        <span class="card-val ${oiColor}">${oiStr}</span>
+      </div>
+      <div class="card-row">
+        <span class="card-key">Long/Short ratio</span>
+        <span class="card-val ${lsColor}">${lsStr}</span>
+      </div>
+    </div>
+
+    <div class="card-divider"></div>
+    <div class="card-rows">
+      <div class="card-row">
+        <span class="card-key">Mínimo periodo</span>
+        <span class="card-val v-muted">${fmtPrice(a.low)}</span>
+      </div>
+      <div class="card-row">
+        <span class="card-key">Máximo periodo</span>
+        <span class="card-val">${fmtPrice(a.high)}</span>
+      </div>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="card-time">${ts}</span>
+    <a class="card-link" href="${link}" target="_blank">VER EN BINANCE →</a>
+  </div>
+</div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+//  UI HELPERS
+// ══════════════════════════════════════════════════════
+function setProgress(done, total) {
+  const pct = total>0?(done/total*100):0;
+  document.getElementById('progress-fill').style.width = pct+'%';
+  document.getElementById('progress-label').textContent =
+    done<total ? `Analizando ${done}/${total}...` : `Completado (${total} mercados)`;
+}
+function setBadge(text,type) {
+  const el = document.getElementById('status-badge');
+  el.textContent = text; el.className = `badge badge-${type}`;
+}
+function startCountdown(sec) {
+  countdown = sec; updateRing(sec,sec);
+  clearInterval(countdownRef);
+  countdownRef = setInterval(()=>{
+    countdown--;
+    updateRing(countdown,sec);
+    if (countdown<=0) { clearInterval(countdownRef); if (!paused) scan(); }
+  },1000);
+}
+function clearCountdown() { clearInterval(countdownRef); document.getElementById('countdown-num').textContent='—'; }
+function updateRing(val,total) {
+  const offset = 113-(val/total)*113;
+  document.getElementById('ring').style.strokeDashoffset = offset;
+  document.getElementById('countdown-num').textContent = val>0?val:'—';
+}
+let flashRef=null;
+function flashTitle(symbol) {
+  if(flashRef) clearInterval(flashRef);
+  let s=0;
+  flashRef=setInterval(()=>{ document.title=s++%2===0?`🚨 ${symbol}`:'BINANCE SCAN'; },900);
+  setTimeout(()=>{ clearInterval(flashRef); document.title='Monitor Binance'; },15000);
+}
+function togglePause() {
+  paused=!paused;
+  const btn=document.getElementById('btn-pause');
+  if(paused){ btn.textContent='▶ Reanudar'; setBadge('PAUSA','amber'); clearCountdown(); log('Pausado','warn'); }
+  else { btn.textContent='⏸ Pausar'; log('Reanudado'); scan(); }
+}
+
+
+// ══════════════════════════════════════════════════════
+//  LOOKUP INDIVIDUAL
+// ══════════════════════════════════════════════════════
+async function lookupTicker() {
+  let input = document.getElementById('lookup-input').value.trim().toUpperCase();
+  if (!input) return;
+  if (!input.endsWith('USDT')) input = input.replace(/USDT$/,'') + 'USDT';
+
+  const resultEl = document.getElementById('lookup-result');
+  resultEl.className = 'visible';
+  resultEl.innerHTML = `<div class="lookup-loading">⏳ Analizando ${input}...</div>`;
+
+  try {
+    // Fetch directo con todos los proxies, independiente del scan
+    const [k1m, k15m, fundingData, oiNow, oiPrev, lsData] = await Promise.all([
+      safeGet(`/fapi/v1/klines?symbol=${input}&interval=1m&limit=15`),
+      safeGet(`/fapi/v1/klines?symbol=${input}&interval=15m&limit=20`),
+      safeGet(`/fapi/v1/premiumIndex?symbol=${input}`),
+      safeGet(`/fapi/v1/openInterest?symbol=${input}`),
+      safeGet(`/fapi/v1/klines?symbol=${input}&interval=15m&limit=3`),
+      safeGet(`/futures/data/globalLongShortAccountRatio?symbol=${input}&period=5m&limit=2`),
+    ]);
+
+    if (!k1m || k1m.length < 2) {
+      resultEl.innerHTML = `<div class="lookup-error">❌ No se encontró <b>${input}</b> en futuros perpetuos. Probá con el símbolo exacto, ej: BTCUSDT, ETHUSDT</div>`;
+      return;
+    }
+
+    const low5  = Math.min(...k1m.slice(0,5).map(k=>parseFloat(k[3])));
+    const high5 = Math.max(...k1m.slice(-5).map(k=>parseFloat(k[2])));
+    const change = low5>0 ? (high5-low5)/low5*100 : 0;
+
+    let rsi = null;
+    if (k15m && k15m.length >= 15) rsi = calcRSI(k15m.map(k=>parseFloat(k[4])), 14);
+
+    let funding = null;
+    if (fundingData && fundingData.lastFundingRate != null)
+      funding = parseFloat(fundingData.lastFundingRate)*100;
+
+    let oiChange = null;
+    if (oiPrev && oiPrev.length >= 2) {
+      const vol1 = parseFloat(oiPrev[oiPrev.length-1][7]);
+      const vol0 = parseFloat(oiPrev[0][7]);
+      if (vol0>0) oiChange = ((vol1-vol0)/vol0)*100;
+    }
+
+    let lsRatio = null;
+    if (lsData && lsData.length>0 && lsData[lsData.length-1].longAccount)
+      lsRatio = parseFloat(lsData[lsData.length-1].longAccount)*100;
+
+    const buyRatio  = calcBuyRatio(k1m);
+    const upperWick = calcUpperWick(k1m);
+    const { bigCandles, spikeCandle } = detectSpeed(k1m);
+    const { score, signal, reasons } = calcSignal({ rsi, funding, oiChange, lsRatio, buyRatio, upperWick, bigCandles, spikeCandle });
+
+    const result = { symbol: input, change, low: low5, high: high5, time: new Date(),
+      rsi, funding, oiChange, lsRatio, buyRatio, upperWick, bigCandles, spikeCandle, score, signal, reasons };
+
+    resultEl.innerHTML = renderSingleCard(result);
+  } catch(e) {
+    resultEl.innerHTML = `<div class="lookup-error">Error: ${e.message}</div>`;
+  }
+}
+
+function renderSingleCard(a) {
+  const pairLink = a.symbol.replace('USDT','_USDT');
+  const link = `https://www.binance.com/es-AR/futures/${pairLink}`;
+  const ts = a.time.toLocaleTimeString('es-AR',{hour12:false});
+  const sigLabels = { short:'🔴 PROBABLE TECHO — SHORT', neutral:'🟡 SEÑAL MIXTA', long:'🟢 MOMENTUM — POSIBLE CONTINÚA' };
+  const dots = Array.from({length:8}, (_,i) => {
+    if (i < a.score) {
+      const cl = a.score>=6?'red': a.score>=3?'amber':'green';
+      return `<div class="dot ${cl}"></div>`;
+    }
+    return `<div class="dot"></div>`;
+  }).join('');
+  const reasonsHtml = a.reasons.length
+    ? a.reasons.slice(0,4).map(r=>`<span class="pill pill-red">${r}</span>`).join(' ')
+    : `<span class="v-muted" style="font-size:10px">Sin señales de techo claras</span>`;
+  const rsiColor  = a.rsi==null?'v-muted': a.rsi>90?'v-red': a.rsi>80?'v-amber': a.rsi>60?'v-purple':'v-green';
+  const fundColor = a.funding==null?'v-muted': a.funding>0.5?'v-red': a.funding>0.15?'v-amber': a.funding<0?'v-green':'v-blue';
+  const oiColor   = a.oiChange==null?'v-muted': a.oiChange<-5?'v-red': a.oiChange<0?'v-amber': a.oiChange>10?'v-amber':'v-green';
+  const lsColor   = a.lsRatio==null?'v-muted': a.lsRatio>75?'v-red': a.lsRatio>60?'v-amber':'v-green';
+  const brColor   = a.buyRatio==null?'v-muted': a.buyRatio<40?'v-red': a.buyRatio<50?'v-amber': a.buyRatio>65?'v-green':'v-blue';
+  const wickColor = a.upperWick>40?'v-red': a.upperWick>25?'v-amber':'v-green';
+
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+    <!-- Left: signal -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#fff">${a.symbol}</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:2px">${a.spikeCandle?'<span class="v-red">Spike 1 vela</span>':`<span class="v-green">${a.bigCandles} velas sólidas</span>`}</div>
+        </div>
+        <span style="font-size:22px;font-weight:700;color:var(--green)">+${a.change.toFixed(2)}%</span>
+      </div>
+      <div class="signal-box ${a.signal}" style="margin-bottom:10px">
+        <div>
+          <div class="signal-label ${a.signal}">${sigLabels[a.signal]}</div>
+          <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${reasonsHtml}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div class="signal-dots">${dots}</div>
+          <div class="signal-score" style="margin-top:4px">score ${a.score}/8</div>
+        </div>
+      </div>
+    </div>
+    <!-- Right: data -->
+    <div class="card-rows" style="gap:7px">
+      <div class="card-row"><span class="card-key">RSI 15m</span><span class="card-val ${rsiColor}">${a.rsi!=null?a.rsi.toFixed(1):'N/A'}</span></div>
+      <div class="card-row"><span class="card-key">Taker buy ratio</span><span class="card-val ${brColor}">${a.buyRatio!=null?a.buyRatio.toFixed(0)+'%':'N/A'}</span></div>
+      <div class="card-row"><span class="card-key">Mecha superior</span><span class="card-val ${wickColor}">${a.upperWick!=null?a.upperWick.toFixed(0)+'%':'N/A'}</span></div>
+      <div class="card-row" style="border-top:1px solid var(--border);padding-top:7px;margin-top:2px">
+        <span class="card-key">Funding rate</span>
+        <span class="card-val ${fundColor}">${a.funding!=null?(a.funding>=0?'+':'')+a.funding.toFixed(3)+'%':'N/A'}</span>
+      </div>
+      <div class="card-row"><span class="card-key">OI cambio</span><span class="card-val ${oiColor}">${a.oiChange!=null?(a.oiChange>=0?'+':'')+a.oiChange.toFixed(1)+'%':'N/A'}</span></div>
+      <div class="card-row"><span class="card-key">Long/Short ratio</span><span class="card-val ${lsColor}">${a.lsRatio!=null?a.lsRatio.toFixed(0)+'% L':'N/A'}</span></div>
+      <div class="card-row" style="border-top:1px solid var(--border);padding-top:7px;margin-top:2px">
+        <span class="card-key">Precio mín</span><span class="card-val v-muted">${fmtPrice(a.low)}</span>
+      </div>
+      <div class="card-row"><span class="card-key">Precio máx</span><span class="card-val">${fmtPrice(a.high)}</span></div>
+      <div style="margin-top:8px;text-align:right">
+        <a class="card-link" href="${link}" target="_blank">VER EN BINANCE →</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+(async()=>{
+  if(location.protocol==='file:') document.getElementById('config-note').style.display='block';
+  await loadSymbols();
+  if(allSymbols.length) scan();
+})();
+</script>
+</body>
+</html>
