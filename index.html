@@ -239,7 +239,7 @@
   <!-- LOOKUP PANEL -->
   <div id="lookup-panel">
     <div class="lookup-header">
-      <span class="lookup-title">🔍 Analizar ticker</span>
+      <span class="lookup-title">🔍 Analizar ticker <span style="color:var(--muted);font-size:9px;letter-spacing:.5px;font-weight:400">(ignora umbral — muestra cualquier par)</span></span>
       <div class="lookup-input-wrap">
         <input id="lookup-input" type="text" placeholder="Ej: BTCUSDT, ETH, SOL..." 
                onkeydown="if(event.key==='Enter') lookupTicker()" autocomplete="off" autocorrect="off" spellcheck="false"/>
@@ -468,16 +468,27 @@ function calcSignal({ rsi, funding, oiChange, lsRatio, buyRatio, upperWick, bigC
 // ══════════════════════════════════════════════════════
 async function processSymbol(symbol, skipThreshold=false) {
   try {
-    // Klines 1m (15 velas) — ya los teníamos
-    const k1m = await safeGet(`/fapi/v1/klines?symbol=${symbol}&interval=1m&limit=15`);
-    if (!k1m || k1m.length < 15) return null;
+    // Usamos la vela de 15m directamente: open vs close de la vela actual
+    // Esto mide exactamente "cuánto subió en los últimos 15 minutos" sin ruido de mechas
+    const k15mRaw = await safeGet(`/fapi/v1/klines?symbol=${symbol}&interval=15m&limit=3`);
+    if (!k15mRaw || k15mRaw.length < 2) return null;
 
-    const low5  = Math.min(...k1m.slice(0,5).map(k=>parseFloat(k[3])));
-    const high5 = Math.max(...k1m.slice(-5).map(k=>parseFloat(k[2])));
-    if (low5 <= 0) return null;
+    const curr  = k15mRaw[k15mRaw.length - 1]; // vela actual (puede estar incompleta)
+    const prev  = k15mRaw[k15mRaw.length - 2]; // vela anterior cerrada
 
-    const change = (high5-low5)/low5*100;
-    const threshold = parseFloat(document.getElementById('threshold').value)||20;
+    const openPrice  = parseFloat(prev[1]);   // open de la vela anterior
+    const closePrice = parseFloat(curr[4]);   // close actual
+    const low5  = Math.min(parseFloat(prev[3]), parseFloat(curr[3])); // low del periodo
+    const high5 = Math.max(parseFloat(prev[2]), parseFloat(curr[2])); // high del periodo
+
+    if (openPrice <= 0) return null;
+
+    // Cambio direccional: close actual vs open de hace 15 min
+    // Solo positivo (pumps), no dumps
+    const change = (closePrice - openPrice) / openPrice * 100;
+    if (change <= 0) return null; // solo pumps, no bajadas
+
+    const threshold = parseFloat(document.getElementById('threshold').value) || 20;
     if (!skipThreshold && change <= threshold) return null;
 
     // ── A partir de aquí, símbolo calificó → buscar todos los extras en paralelo ──
@@ -554,7 +565,7 @@ async function scan() {
   for (let i=0; i<allSymbols.length; i+=BATCH) {
     if (paused) break;
     const batch = allSymbols.slice(i, i+BATCH);
-    const results = await Promise.all(batch.map(processSymbol));
+    const results = await Promise.all(batch.map(s => processSymbol(s)));
     results.forEach(r => { if (r) alerts.push(r); });
     done += batch.length;
     setProgress(done, allSymbols.length);
@@ -820,8 +831,8 @@ async function lookupTicker() {
       return;
     }
 
-    const low5  = Math.min(...k1m.slice(0,5).map(k=>parseFloat(k[3])));
-    const high5 = Math.max(...k1m.slice(-5).map(k=>parseFloat(k[2])));
+    const low5  = Math.min(...k1m.slice(0,8).map(k=>parseFloat(k[3])));
+    const high5 = Math.max(...k1m.slice(-7).map(k=>parseFloat(k[2])));
     const change = low5>0 ? (high5-low5)/low5*100 : 0;
 
     let rsi = null;
