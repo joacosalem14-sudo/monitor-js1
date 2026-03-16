@@ -492,11 +492,12 @@ async function processSymbol(symbol, skipThreshold=false) {
     if (!skipThreshold && change <= threshold) return null;
 
     // ── A partir de aquí, símbolo calificó → buscar todos los extras en paralelo ──
-    const [k15m, fundingData, oiNow, oiPrev, lsData] = await Promise.all([
+    const [k1m, k15m, fundingData, oiNow, oiPrev, lsData] = await Promise.all([
+      safeGet(`/fapi/v1/klines?symbol=${symbol}&interval=1m&limit=15`),
       safeGet(`/fapi/v1/klines?symbol=${symbol}&interval=15m&limit=20`),
       safeGet(`/fapi/v1/premiumIndex?symbol=${symbol}`),
       safeGet(`/fapi/v1/openInterest?symbol=${symbol}`),
-      safeGet(`/fapi/v1/klines?symbol=${symbol}&interval=15m&limit=3`), // OI histórico aproximado via precio*vol
+      safeGet(`/fapi/v1/klines?symbol=${symbol}&interval=15m&limit=3`),
       safeGet(`/futures/data/globalLongShortAccountRatio?symbol=${symbol}&period=5m&limit=2`),
     ]);
 
